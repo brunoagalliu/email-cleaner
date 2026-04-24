@@ -1,0 +1,27 @@
+{
+  "name": "email-cleaner",
+  "version": "1.0.0",
+  "main": "server.js",
+  "bin": {
+    "email-cleaner": "./cli.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "cli": "node cli.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Email list cleaning and validation tool",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.3",
+    "csv-parse": "^6.2.1",
+    "csv-stringify": "^6.7.0",
+    "disposable-email-domains": "^1.0.62",
+    "express": "^5.2.1",
+    "mailcheck": "^1.1.1",
+    "multer": "^2.1.1",
+    "validator": "^13.15.35"
+  }
+}

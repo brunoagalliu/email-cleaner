@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Cleaner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1a1f2e;
+      border: 1px solid #2d3448;
+      border-radius: 16px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    .drop-zone {
+      border: 2px dashed #334155;
+      border-radius: 12px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #6366f1;
+      background: rgba(99,102,241,0.05);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .drop-label { font-size: 1rem; color: #94a3b8; }
+    .drop-label span { color: #6366f1; font-weight: 600; }
+    .drop-hint { font-size: 0.8rem; color: #475569; margin-top: 0.5rem; }
+    .file-selected { color: #6366f1; font-weight: 600; margin-top: 0.5rem; font-size: 0.9rem; }
+
+    .options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .option-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 0.4rem;
+      font-weight: 500;
+    }
+
+    .option-group input[type="range"] {
+      width: 100%;
+      accent-color: #6366f1;
+    }
+
+    .option-group .range-val {
+      font-size: 0.85rem;
+      color: #6366f1;
+      font-weight: 600;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    .checkbox-row input { accent-color: #6366f1; }
+
+    .btn {
+      width: 100%;
+      padding: 0.85rem;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #6366f1;
+      color: white;
+    }
+
+    .btn:hover:not(:disabled) { background: #5558e8; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .progress-section { display: none; margin-top: 1.5rem; }
+    .progress-section.visible { display: block; }
+
+    .progress-bar-wrap {
+      background: #0f1117;
+      border-radius: 8px;
+      height: 8px;
+      overflow: hidden;
+      margin: 0.75rem 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      border-radius: 8px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .progress-text { font-size: 0.85rem; color: #64748b; text-align: center; }
+
+    .results { display: none; margin-top: 1.5rem; }
+    .results.visible { display: block; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat {
+      background: #0f1117;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+      border: 1px solid #1e2435;
+    }
+
+    .stat-value { font-size: 1.6rem; font-weight: 700; }
+    .stat-label { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
+    .stat.valid .stat-value { color: #22c55e; }
+    .stat.risky .stat-value { color: #f59e0b; }
+    .stat.invalid .stat-value { color: #ef4444; }
+
+    .typo-note {
+      font-size: 0.82rem;
+      color: #a78bfa;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .btn-download {
+      background: #22c55e;
+    }
+    .btn-download:hover { background: #16a34a; }
+
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: #fca5a5;
+      margin-top: 1rem;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Email Cleaner</h1>
+  <p class="subtitle">Validate and clean your email lists in seconds</p>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".csv,.txt" />
+    <div class="drop-icon">📋</div>
+    <div class="drop-label">Drop your file here or <span>browse</span></div>
+    <div class="drop-hint">Supports .csv and .txt &mdash; up to 50MB</div>
+    <div class="file-selected" id="fileSelected"></div>
+  </div>
+
+  <div class="options">
+    <div class="option-group">
+      <label>Min score to keep: <span class="range-val" id="scoreVal">50</span></label>
+      <input type="range" id="minScore" min="0" max="100" value="50"
+        oninput="document.getElementById('scoreVal').textContent = this.value" />
+    </div>
+    <div class="option-group">
+      <label>Concurrency: <span class="range-val" id="concurVal">20</span></label>
+      <input type="range" id="concurrency" min="1" max="50" value="20"
+        oninput="document.getElementById('concurVal').textContent = this.value" />
+    </div>
+  </div>
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="filterOnly" />
+    <label for="filterOnly">Only include rows that pass min-score (filter mode)</label>
+  </div>
+
+  <button class="btn" id="uploadBtn" disabled onclick="startUpload()">
+    Upload &amp; Clean
+  </button>
+
+  <div class="progress-section" id="progressSection">
+    <div class="progress-text" id="progressText">Validating...</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="stats">
+      <div class="stat valid">
+        <div class="stat-value" id="statValid">0</div>
+        <div class="stat-label">Valid</div>
+      </div>
+      <div class="stat risky">
+        <div class="stat-value" id="statRisky">0</div>
+        <div class="stat-label">Risky</div>
+      </div>
+      <div class="stat invalid">
+        <div class="stat-value" id="statInvalid">0</div>
+        <div class="stat-label">Invalid</div>
+      </div>
+    </div>
+    <div class="typo-note" id="typoNote"></div>
+    <button class="btn btn-download" id="downloadBtn">Download Cleaned CSV</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+</div>
+
+<script>
+  let currentJobId = null;
+  let pollInterval = null;
+
+  const fileInput = document.getElementById('fileInput');
+  const dropZone = document.getElementById('dropZone');
+  const fileSelected = document.getElementById('fileSelected');
+  const uploadBtn = document.getElementById('uploadBtn');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) {
+      fileSelected.textContent = fileInput.files[0].name;
+      uploadBtn.disabled = false;
+    }
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      fileSelected.textContent = file.name;
+      uploadBtn.disabled = false;
+    }
+  });
+
+  async function startUpload() {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    hideError();
+    uploadBtn.disabled = true;
+    document.getElementById('results').classList.remove('visible');
+    document.getElementById('progressSection').classList.add('visible');
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressText').textContent = 'Uploading...';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('minScore', document.getElementById('minScore').value);
+    fd.append('filterOnly', document.getElementById('filterOnly').checked);
+    fd.append('concurrency', document.getElementById('concurrency').value);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      currentJobId = data.jobId;
+      pollInterval = setInterval(pollStatus, 800);
+    } catch (err) {
+      showError(err.message);
+      resetUI();
+    }
+  }
+
+  async function pollStatus() {
+    try {
+      const res = await fetch(`/api/status/${currentJobId}`);
+      const job = await res.json();
+
+      if (job.status === 'running') {
+        const pct = job.total > 0 ? Math.floor((job.progress / job.total) * 100) : 0;
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressText').textContent =
+          `Validating ${job.progress.toLocaleString()} / ${job.total.toLocaleString()} emails (${pct}%)`;
+      }
+
+      if (job.status === 'done') {
+        clearInterval(pollInterval);
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressText').textContent = 'Done!';
+        showResults(job.results);
+      }
+
+      if (job.status === 'error') {
+        clearInterval(pollInterval);
+        showError(job.error || 'Processing failed');
+        resetUI();
+      }
+    } catch (err) {
+      clearInterval(pollInterval);
+      showError('Lost connection to server');
+      resetUI();
+    }
+  }
+
+  function showResults(r) {
+    document.getElementById('statValid').textContent = r.valid.toLocaleString();
+    document.getElementById('statRisky').textContent = r.risky.toLocaleString();
+    document.getElementById('statInvalid').textContent = r.invalid.toLocaleString();
+
+    const typoNote = document.getElementById('typoNote');
+    typoNote.textContent = r.typos > 0
+      ? `${r.typos.toLocaleString()} possible typos detected — see the "suggestion" column`
+      : '';
+
+    document.getElementById('downloadBtn').onclick = () => {
+      window.location.href = `/api/download/${currentJobId}`;
+      setTimeout(resetUI, 2000);
+    };
+
+    document.getElementById('results').classList.add('visible');
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Clean Another File';
+    uploadBtn.onclick = () => { resetUI(); uploadBtn.onclick = startUpload; };
+  }
+
+  function resetUI() {
+    document.getElementById('progressSection').classList.remove('visible');
+    uploadBtn.disabled = !fileInput.files[0];
+    uploadBtn.textContent = 'Upload & Clean';
+    uploadBtn.onclick = startUpload;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function hideError() {
+    document.getElementById('errorMsg').classList.remove('visible');
+  }
+</script>
+</body>
+</html>
