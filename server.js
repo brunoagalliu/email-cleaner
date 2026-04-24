@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const { loadFile, writeResults } = require('./src/csvHandler');
 const { processEmails } = require('./src/processor');
+const db = require('./src/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,13 +23,11 @@ app.use(session({
   cookie: { httpOnly: true, maxAge: 8 * 60 * 60 * 1000 }, // 8 hours
 }));
 
-// Auth middleware — allow login page assets through
 function requireAuth(req, res, next) {
   if (req.session.authenticated) return next();
   res.redirect('/login');
 }
 
-// Serve login page (unauthenticated)
 app.get('/login', (req, res) => {
   if (req.session.authenticated) return res.redirect('/');
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -53,6 +52,7 @@ app.get('/logout', (req, res) => {
 
 // All routes below require authentication
 app.use(requireAuth);
+app.use(express.static(path.join(__dirname, 'public')));
 
 const upload = multer({
   dest: os.tmpdir(),
@@ -64,9 +64,7 @@ const upload = multer({
   },
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-// In-memory job store (sufficient for single-user tool)
+// In-memory job store for active (in-progress) jobs
 const jobs = new Map();
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
@@ -88,7 +86,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
   res.json({ jobId });
 
-  // Process async in background
   setImmediate(async () => {
     try {
       const { emails } = await loadFile(req.file.path);
@@ -110,19 +107,25 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         ? results.filter(r => r.score >= minScore)
         : results;
 
+      // Write to temp file, read content, save to DB
       const outputPath = path.join(os.tmpdir(), `cleaned_${jobId}.csv`);
       await writeResults(outputRows, outputPath, null);
+      const csvContent = fs.readFileSync(outputPath, 'utf8');
+      fs.unlinkSync(outputPath);
 
-      job.status = 'done';
-      job.results = {
+      const stats = {
         total: results.length,
         valid: results.filter(r => r.status === 'valid').length,
         risky: results.filter(r => r.status === 'risky').length,
         invalid: results.filter(r => r.status === 'invalid').length,
         typos: results.filter(r => r.suggestion).length,
         outputRows: outputRows.length,
-        outputPath,
       };
+
+      await db.saveJob(jobId, req.file.originalname, stats, csvContent);
+
+      job.status = 'done';
+      job.results = stats;
 
       fs.unlinkSync(req.file.path);
     } catch (err) {
@@ -146,21 +149,45 @@ app.get('/api/status/:jobId', (req, res) => {
   });
 });
 
-app.get('/api/download/:jobId', (req, res) => {
-  const job = jobs.get(req.params.jobId);
-  if (!job || job.status !== 'done') {
-    return res.status(404).json({ error: 'Result not ready' });
+app.get('/api/download/:jobId', async (req, res) => {
+  try {
+    const row = await db.getJobCSV(req.params.jobId);
+    if (!row) return res.status(404).json({ error: 'Job not found' });
+
+    const outputName = row.filename.replace(/(\.[^.]+)$/, '_cleaned.csv');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
+    res.send(row.csv_content);
+  } catch (err) {
+    res.status(500).json({ error: 'Download failed' });
   }
+});
 
-  const outputName = job.filename.replace(/(\.[^.]+)$/, '_cleaned.csv');
-  res.download(job.results.outputPath, outputName, (err) => {
-    if (!err) {
-      try { fs.unlinkSync(job.results.outputPath); } catch {}
-      jobs.delete(req.params.jobId);
-    }
+app.get('/api/history', async (req, res) => {
+  try {
+    const jobs = await db.listJobs();
+    res.json(jobs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load history' });
+  }
+});
+
+app.delete('/api/history/:jobId', async (req, res) => {
+  try {
+    await db.deleteJob(req.params.jobId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete job' });
+  }
+});
+
+db.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n  Email Cleaner running at http://localhost:${PORT}\n`);
+    });
+  })
+  .catch(err => {
+    console.error('Failed to initialize database:', err.message);
+    process.exit(1);
   });
-});
-
-app.listen(PORT, () => {
-  console.log(`\n  Email Cleaner running at http://localhost:${PORT}\n`);
-});

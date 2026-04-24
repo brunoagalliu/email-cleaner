@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Cleaner — History</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .header {
+      max-width: 900px;
+      margin: 0 auto 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header h1 { font-size: 1.4rem; font-weight: 700; color: #f8fafc; }
+    .header .subtitle { font-size: 0.85rem; color: #64748b; margin-top: 0.2rem; }
+
+    .nav { display: flex; gap: 0.75rem; align-items: center; }
+
+    .nav a {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-decoration: none;
+      padding: 0.4rem 0.9rem;
+      border: 1px solid #2d3448;
+      border-radius: 7px;
+      transition: all 0.2s;
+    }
+    .nav a:hover { color: #f1f5f9; border-color: #475569; }
+    .nav a.primary { background: #6366f1; color: white; border-color: #6366f1; }
+    .nav a.primary:hover { background: #5558e8; }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    .empty {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #475569;
+      background: #1a1f2e;
+      border: 1px solid #2d3448;
+      border-radius: 16px;
+    }
+    .empty .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .empty p { font-size: 0.95rem; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1a1f2e;
+      border: 1px solid #2d3448;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    thead { background: #141824; }
+
+    th {
+      text-align: left;
+      padding: 0.85rem 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #2d3448;
+    }
+
+    td {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid #1e2535;
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(99,102,241,0.04); }
+
+    .filename {
+      font-weight: 500;
+      color: #f1f5f9;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .date { color: #64748b; font-size: 0.8rem; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge.valid   { background: rgba(34,197,94,0.15);  color: #22c55e; }
+    .badge.risky   { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .badge.invalid { background: rgba(239,68,68,0.15);  color: #ef4444; }
+
+    .actions { display: flex; gap: 0.5rem; }
+
+    .btn-dl {
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #22c55e;
+      color: white;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-dl:hover { background: #16a34a; }
+
+    .btn-del {
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px;
+      border: 1px solid #3d4560;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: #64748b;
+      transition: all 0.2s;
+    }
+    .btn-del:hover { border-color: #ef4444; color: #ef4444; }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Cleaning History</h1>
+    <div class="subtitle">Past email list cleaning jobs</div>
+  </div>
+  <div class="nav">
+    <a href="/" class="primary">+ New Clean</a>
+    <a href="/logout">Sign out</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="loading" id="loading">Loading...</div>
+  <div id="tableWrap" style="display:none"></div>
+  <div class="empty" id="empty" style="display:none">
+    <div class="icon">📭</div>
+    <p>No cleaning jobs yet. Upload a file to get started.</p>
+  </div>
+</div>
+
+<script>
+  async function load() {
+    const res = await fetch('/api/history');
+    const jobs = await res.json();
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (!jobs.length) {
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    const wrap = document.getElementById('tableWrap');
+    wrap.style.display = 'block';
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Date</th>
+            <th>Total</th>
+            <th>Valid</th>
+            <th>Risky</th>
+            <th>Invalid</th>
+            <th>Output rows</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${jobs.map(j => `
+            <tr id="row-${j.id}">
+              <td class="filename" title="${esc(j.filename)}">${esc(j.filename)}</td>
+              <td class="date">${formatDate(j.created_at)}</td>
+              <td>${j.total?.toLocaleString() ?? '—'}</td>
+              <td><span class="badge valid">${j.valid?.toLocaleString() ?? '—'}</span></td>
+              <td><span class="badge risky">${j.risky?.toLocaleString() ?? '—'}</span></td>
+              <td><span class="badge invalid">${j.invalid?.toLocaleString() ?? '—'}</span></td>
+              <td>${j.output_rows?.toLocaleString() ?? '—'}</td>
+              <td>
+                <div class="actions">
+                  <a class="btn-dl" href="/api/download/${j.id}">Download</a>
+                  <button class="btn-del" onclick="deleteJob('${j.id}')">Delete</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  async function deleteJob(id) {
+    if (!confirm('Delete this job?')) return;
+    await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.remove();
+    const tbody = document.querySelector('tbody');
+    if (tbody && !tbody.children.length) {
+      document.getElementById('tableWrap').style.display = 'none';
+      document.getElementById('empty').style.display = 'block';
+    }
+  }
+
+  function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  load();
+</script>
+</body>
+</html>
