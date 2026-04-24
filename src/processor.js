@@ -1,5 +1,5 @@
 const { checkSyntax } = require('./validators/syntax');
-const { checkMX } = require('./validators/dns');
+const { checkMX, warmDomainCache } = require('./validators/dns');
 const { checkDisposable } = require('./validators/disposable');
 const { checkRoleEmail } = require('./validators/roleEmail');
 const { checkTypo } = require('./validators/typo');
@@ -24,14 +24,13 @@ async function validateEmail(rawEmail) {
 
   const email = syntaxResult.email;
 
-  // Run non-async checks immediately
   const disposableResult = checkDisposable(email);
   const roleResult = checkRoleEmail(email);
 
   if (!disposableResult.valid) checks.push(disposableResult);
   if (!roleResult.valid) checks.push(roleResult);
 
-  // Run async checks in parallel
+  // MX is a cache hit after pre-warming; run with typo check in parallel
   const [mxResult, typoResult] = await Promise.all([
     checkMX(email),
     checkTypo(email),
@@ -52,7 +51,14 @@ async function validateEmail(rawEmail) {
   };
 }
 
-async function processEmails(emails, { concurrency = 20, onProgress } = {}) {
+async function processEmails(emails, { concurrency = 50, onProgress } = {}) {
+  // Phase 1: resolve all unique domains in parallel before touching emails.
+  // This fills the cache so every MX check below is an instant lookup.
+  const validEmails = emails.filter(e => e && e.includes('@'));
+  const domains = validEmails.map(e => e.trim().toLowerCase().split('@')[1]).filter(Boolean);
+  await warmDomainCache(domains, concurrency);
+
+  // Phase 2: validate all emails (MX checks are now cache hits)
   const results = [];
   let completed = 0;
 

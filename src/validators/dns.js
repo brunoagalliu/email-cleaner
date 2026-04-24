@@ -36,4 +36,13 @@ async function checkMX(email) {
   return result;
 }
 
-module.exports = { checkMX };
+async function warmDomainCache(domains, concurrency = 50) {
+  const unique = [...new Set(domains)].filter(d => !cache.has(d));
+  for (let i = 0; i < unique.length; i += concurrency) {
+    await Promise.all(unique.slice(i, i + concurrency).map(domain =>
+      checkMX(`x@${domain}`)
+    ));
+  }
+}
+
+module.exports = { checkMX, warmDomainCache };
