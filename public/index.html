@@ -26,6 +26,7 @@
       width: 100%;
       max-width: 600px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      position: relative;
     }
 
     h1 {
@@ -40,6 +41,20 @@
       font-size: 0.9rem;
       margin-bottom: 2rem;
     }
+
+    .logout {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.5rem;
+      font-size: 0.8rem;
+      color: #475569;
+      text-decoration: none;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid #2d3448;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .logout:hover { color: #94a3b8; border-color: #475569; }
 
     .drop-zone {
       border: 2px dashed #334155;
@@ -197,6 +212,7 @@
 </head>
 <body>
 <div class="card">
+  <a class="logout" href="/logout">Sign out</a>
   <h1>Email Cleaner</h1>
   <p class="subtitle">Validate and clean your email lists in seconds</p>
 

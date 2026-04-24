@@ -1,4 +1,5 @@
 const express = require('express');
+const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -8,6 +9,50 @@ const { processEmails } = require('./src/processor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const LOGIN_USER = process.env.LOGIN_USER || 'admin';
+const LOGIN_PASS = process.env.LOGIN_PASS || 'changeme';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
+
+app.use(express.urlencoded({ extended: false }));
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, maxAge: 8 * 60 * 60 * 1000 }, // 8 hours
+}));
+
+// Auth middleware — allow login page assets through
+function requireAuth(req, res, next) {
+  if (req.session.authenticated) return next();
+  res.redirect('/login');
+}
+
+// Serve login page (unauthenticated)
+app.get('/login', (req, res) => {
+  if (req.session.authenticated) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === LOGIN_USER && password === LOGIN_PASS) {
+    req.session.authenticated = true;
+    return res.redirect('/');
+  }
+  res.send(`
+    <!DOCTYPE html><html><head><meta http-equiv="refresh" content="2;url=/login">
+    <style>body{background:#0f1117;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#fca5a5;}</style>
+    </head><body>Invalid credentials. Redirecting...</body></html>
+  `);
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+
+// All routes below require authentication
+app.use(requireAuth);
 
 const upload = multer({
   dest: os.tmpdir(),
@@ -110,7 +155,6 @@ app.get('/api/download/:jobId', (req, res) => {
   const outputName = job.filename.replace(/(\.[^.]+)$/, '_cleaned.csv');
   res.download(job.results.outputPath, outputName, (err) => {
     if (!err) {
-      // Clean up temp file after download
       try { fs.unlinkSync(job.results.outputPath); } catch {}
       jobs.delete(req.params.jobId);
     }
