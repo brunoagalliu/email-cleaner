@@ -8,12 +8,11 @@ const OUTPUT_COLUMNS = ['original', 'email', 'score', 'status', 'reasons', 'sugg
 async function readCSV(filePath) {
   return new Promise((resolve, reject) => {
     const emails = [];
-    const columnName = { index: null, name: null };
+    const columnName = { index: null, name: null, noHeaders: false };
 
     fs.createReadStream(filePath)
       .pipe(parse({ columns: true, trim: true, skip_empty_lines: true }))
       .on('data', (row) => {
-        // Auto-detect the email column on first row
         if (columnName.index === null) {
           const keys = Object.keys(row);
           const emailKey = keys.find(k =>
@@ -21,11 +20,18 @@ async function readCSV(filePath) {
           ) || keys[0];
           columnName.name = emailKey;
           columnName.index = 0;
+
+          // If the detected column name is itself an email, the file has no
+          // headers — the first row was consumed as the header. Add it back.
+          if (emailKey.includes('@')) {
+            columnName.noHeaders = true;
+            emails.push({ email: emailKey, row: null });
+          }
         }
         const val = row[columnName.name];
-        if (val) emails.push({ email: val, row });
+        if (val) emails.push({ email: val, row: columnName.noHeaders ? null : row });
       })
-      .on('end', () => resolve({ emails, columnName: columnName.name }))
+      .on('end', () => resolve({ emails, columnName: columnName.noHeaders ? null : columnName.name }))
       .on('error', reject);
   });
 }
