@@ -1,6 +1,6 @@
-const dns = require('dns').promises;
-
 const cache = new Map();
+
+const DOH_URL = 'https://dns.google/resolve';
 
 async function checkMX(email) {
   const domain = email.split('@')[1];
@@ -9,22 +9,31 @@ async function checkMX(email) {
     return cache.get(domain);
   }
 
+  let result;
   try {
-    const records = await dns.resolveMx(domain);
-    const result = records && records.length > 0
-      ? { valid: true }
-      : { valid: false, reason: 'no_mx_records' };
-    cache.set(domain, result);
-    return result;
-  } catch (err) {
-    let reason = 'dns_lookup_failed';
-    if (err.code === 'ENOTFOUND' || err.code === 'ENODATA') {
-      reason = 'domain_not_found';
+    const res = await fetch(`${DOH_URL}?name=${encodeURIComponent(domain)}&type=MX`, {
+      headers: { Accept: 'application/dns-json' },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) throw new Error(`DoH HTTP ${res.status}`);
+
+    const data = await res.json();
+
+    // Status 0 = NOERROR, 3 = NXDOMAIN
+    if (data.Status === 3) {
+      result = { valid: false, reason: 'domain_not_found' };
+    } else if (data.Status !== 0 || !data.Answer?.length) {
+      result = { valid: false, reason: 'no_mx_records' };
+    } else {
+      result = { valid: true };
     }
-    const result = { valid: false, reason };
-    cache.set(domain, result);
-    return result;
+  } catch (err) {
+    result = { valid: false, reason: 'dns_lookup_failed' };
   }
+
+  cache.set(domain, result);
+  return result;
 }
 
 module.exports = { checkMX };
