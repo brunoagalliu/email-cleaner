@@ -1,22 +1,36 @@
 const SMTP_URL = process.env.SMTP_CHECKER_URL;
 const SMTP_SECRET = process.env.SMTP_CHECKER_SECRET;
 
+// Domains known to block SMTP probes and return false positives
+const SMTP_BLOCKED_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com',
+  'hotmail.com', 'hotmail.co.uk', 'hotmail.fr', 'hotmail.de', 'hotmail.es', 'hotmail.it',
+  'outlook.com', 'outlook.co.uk', 'outlook.fr', 'outlook.de', 'outlook.es',
+  'live.com', 'live.co.uk', 'live.fr', 'live.de', 'live.nl',
+  'msn.com',
+  'icloud.com', 'me.com', 'mac.com',
+]);
+
 // Group emails by domain and call the SMTP checker in one request per domain
 async function smtpCheckBatch(emails) {
   if (!SMTP_URL || !SMTP_SECRET) {
     return {};
   }
 
-  // Group by domain
+  // Group by domain — skip known-blocked domains
   const byDomain = {};
+  const results = {};
+
   for (const email of emails) {
     const domain = email.split('@')[1];
     if (!domain) continue;
+    if (SMTP_BLOCKED_DOMAINS.has(domain)) {
+      results[email] = 'unknown'; // blocked provider — can't reliably check
+      continue;
+    }
     if (!byDomain[domain]) byDomain[domain] = [];
     byDomain[domain].push(email);
   }
-
-  const results = {};
 
   await Promise.all(
     Object.entries(byDomain).map(async ([domain, domainEmails]) => {
