@@ -54,6 +54,10 @@ app.get('/logout', (req, res) => {
 app.use(requireAuth);
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/history', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'history.html'));
+});
+
 const upload = multer({
   dest: os.tmpdir(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
