@@ -243,6 +243,11 @@
     <label for="filterOnly">Only include rows that pass min-score (filter mode)</label>
   </div>
 
+  <div class="checkbox-row">
+    <input type="checkbox" id="smtpCheck" />
+    <label for="smtpCheck">SMTP verification — slower but detects invalid mailboxes and catch-all domains</label>
+  </div>
+
   <button class="btn" id="uploadBtn" disabled onclick="startUpload()">
     Upload &amp; Clean
   </button>
@@ -323,6 +328,7 @@
     fd.append('minScore', document.getElementById('minScore').value);
     fd.append('filterOnly', document.getElementById('filterOnly').checked);
     fd.append('concurrency', document.getElementById('concurrency').value);
+    fd.append('smtpCheck', document.getElementById('smtpCheck').checked);
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: fd });

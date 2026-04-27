@@ -74,6 +74,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   const minScore = parseInt(req.body.minScore || '50', 10);
   const filterOnly = req.body.filterOnly === 'true';
   const concurrency = parseInt(req.body.concurrency || '20', 10);
+  const smtpCheck = req.body.smtpCheck === 'true';
 
   jobs.set(jobId, {
     status: 'running',
@@ -96,6 +97,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         emails.map(e => e.email),
         {
           concurrency,
+          smtpCheck,
           onProgress(done, total) {
             job.progress = done;
             job.total = total;

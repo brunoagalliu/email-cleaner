@@ -19,6 +19,7 @@ program
   .option('-c, --concurrency <number>', 'Parallel DNS lookups', '20')
   .option('--min-score <number>', 'Minimum score to keep (0-100)', '50')
   .option('--filter', 'Only output emails that pass the min-score threshold')
+  .option('--smtp', 'Enable SMTP verification (requires SMTP_CHECKER_URL and SMTP_CHECKER_SECRET env vars)')
   .action(async (file, options) => {
     const inputPath = path.resolve(file);
 
@@ -59,6 +60,7 @@ program
       emails.map(e => e.email),
       {
         concurrency,
+        smtpCheck: !!options.smtp,
         onProgress(done, total) {
           const pct = Math.floor((done / total) * 100);
           if (pct !== lastPct) {

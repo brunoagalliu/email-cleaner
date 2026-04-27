@@ -11,6 +11,8 @@ const DEDUCTIONS = {
   disposable_email:     90,
   role_based_email:     30,
   possible_typo:        20,
+  smtp_invalid:         40,
+  smtp_catch_all:       10,
 };
 
 // Status thresholds

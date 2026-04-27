@@ -71,6 +71,7 @@ async function writeResults(results, outputPath, originalRows) {
         status: r.status,
         reasons: r.reasons,
         suggestion: r.suggestion,
+        smtp_status: r.smtp_status || 'skipped',
       };
     });
 
